@@ -1,6 +1,6 @@
 # MedLaunch – Facility Metrics Pipeline (Stages 1–3)
 
-This repository contains an end‑to‑end data flow that ingests facility JSON from S3, models it in Athena, filters expiring accreditations with Python/Lambda, and runs an event‑driven Athena query to publish state‑level metrics to S3 (previewable CSV).
+This repository contains an end-to-end data flow that ingests facility JSON from S3, models it in Athena, filters expiring accreditations with Python/Lambda, and runs an event-driven Athena query to publish state-level metrics to S3 (previewable CSV).
 
 ## Quick Links
 - **Stages implemented:** 1, 2, 3
@@ -11,34 +11,33 @@ This repository contains an end‑to‑end data flow that ingests facility JSON 
 
 ---
 
-## High‑Level Architecture
+## High-Level Architecture
 
 ```mermaid
 flowchart LR
   subgraph S3["Amazon S3"]
-    A[data/data.json<br/>NDJSON/JSON]:::s3
-    B[filtered/*.ndjson]:::s3
-    C[exports/state_counts/<...>/000000<br/>(CSV)]:::s3
-    P[results/facility_metrics/run_*/part-*.parquet]:::s3
+    A["data/data.json (NDJSON)"]:::s3
+    B["filtered/*.ndjson"]:::s3
+    C["exports/state_counts/.../000000 (CSV)"]:::s3
+    P["results/facility_metrics/run_*/part-*.parquet"]:::s3
   end
 
   subgraph Athena["Amazon Athena"]
-    T[(facilities_raw)]:::athena
-    M[(facility_metrics)]:::athena
+    T[("facilities_raw")]:::athena
+    M[("facility_metrics")]:::athena
   end
 
   subgraph Lambda["AWS Lambda"]
-    L2[Stage 2 Filter Function]:::lambda
-    L3[Stage 3 On-Upload Metrics]:::lambda
+    L2["Stage 2 Filter Function"]:::lambda
+    L3["Stage 3 On-Upload Metrics"]:::lambda
   end
 
-  A -- Stage 1: External Table --> T
-  T -- CTAS --> P
-  A -- S3 Event (optional) --> L2
-  L2 -- writes --> B
-  A -- S3 Event --> L3
-  L3 -- UNLOAD CSV --> C
-  T -- queried by --> L3
+  A -->|Stage 1: External Table| T
+  T -->|CTAS| P
+  A -->|S3 Event (optional)| L2
+  L2 -->|writes| B
+  A -->|S3 Event| L3
+  L3 -->|UNLOAD CSV| C
 
 classDef s3 fill:#f1f8ff,stroke:#1f6feb,color:#0b2,stroke-width:1.5px;
 classDef athena fill:#fff7ed,stroke:#fb923c,color:#b45309,stroke-width:1.5px;
@@ -129,14 +128,14 @@ Filter facilities whose **any** accreditation expires within _N_ months and writ
 ```mermaid
 sequenceDiagram
   autonumber
-  participant S3 as S3 (data/)
+  participant S3 as S3 data/
   participant L2 as Lambda Stage 2
-  participant S3o as S3 (filtered/)
+  participant S3o as S3 filtered/
 
   S3->>L2: ObjectCreated:Put (data.json)
-  L2->>S3: GetObject(data.json)
+  L2->>S3: GetObject data.json
   L2->>L2: Parse & filter (<= N months)
-  L2->>S3o: PutObject(filtered/data_filtered.ndjson)
+  L2->>S3o: PutObject filtered/data_filtered.ndjson
 ```
 
 ### Run locally (example)
@@ -150,7 +149,7 @@ python filter_expiring_accreditations.py \
 
 ---
 
-## Stage 3 — Event‑Driven Metrics (Lambda + Athena UNLOAD)
+## Stage 3 — Event-Driven Metrics (Lambda + Athena UNLOAD)
 
 ### Purpose
 On every new upload to `data/`, run an Athena query to count **accredited facilities per state** and **UNLOAD** CSV (with header) to S3.
@@ -182,9 +181,9 @@ WITH (format='TEXTFILE', field_delimiter=',', compression='NONE');
 
 ```mermaid
 flowchart TB
-  A[S3 Put: data/*.json]:::s3 --> L[Lambda Stage 3]:::lambda
-  L -->|StartQueryExecution| AT[Amazon Athena]:::athena
-  AT -->|UNLOAD CSV| E[s3://medlaunch/exports/state_counts/.../000000]:::s3
+  A["S3 Put: data/*.json"]:::s3 --> L["Lambda Stage 3"]:::lambda
+  L -->|StartQueryExecution| AT["Amazon Athena"]:::athena
+  AT -->|UNLOAD CSV| E["s3://medlaunch/exports/state_counts/.../000000"]:::s3
 
 classDef s3 fill:#f1f8ff,stroke:#1f6feb,color:#0b2,stroke-width:1.5px;
 classDef lambda fill:#fefce8,stroke:#eab308,color:#854d0e,stroke-width:1.5px;
@@ -221,16 +220,16 @@ s3://medlaunch/
 
 - **Athena: Cannot create table on file** → point to a **folder** (trailing `/`).
 - **timestamp with time zone in CTAS** → cast to `DATE` (or tz-less TIMESTAMP).
-- **PAR1 / HIVE_BAD_DATA** → table LOCATION includes non‑Parquet files.
+- **PAR1 / HIVE_BAD_DATA** → table LOCATION includes non-Parquet files.
 - **UNLOAD only shows manifest** → the `000000` object(s) are the data; click **Open**.
 - **AccessDenied** → add S3 Put/Get/List, Athena Start/Get, Glue read; include KMS if used.
 - **Correlated subquery not supported** → use `CROSS JOIN UNNEST` + aggregate.
 
 ---
 
-## Cost & Limits (free‑tier friendly)
+## Cost & Limits (free-tier friendly)
 - Athena scanned bytes minimized via Parquet outputs.
-- Lambda is event‑driven; short invocations. No servers to run.
+- Lambda is event-driven; short invocations. No servers to run.
 - S3 storage only for small CSV/Parquet artifacts.
 
 ---
@@ -241,4 +240,3 @@ s3://medlaunch/
 3. Deploy Stage 2 Lambda; set env; Test with S3 event.
 4. Deploy Stage 3 Lambda; set env; add S3 trigger; upload again.
 5. Open results at `exports/state_counts/.../000000` (CSV preview).
-
