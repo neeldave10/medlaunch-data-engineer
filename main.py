@@ -6,7 +6,7 @@ from urllib.parse import unquote_plus
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-# ---------- Logging ----------
+#  Logging 
 logger = logging.getLogger("filter_expiring_accreditations")
 if not logger.handlers:
     h = logging.StreamHandler(sys.stdout)
@@ -16,7 +16,7 @@ logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3")
 
-# ---------- Parsing helpers ----------
+#  Parsing helpers 
 def _iter_ndjson(text: str) -> Optional[List[Dict[str, Any]]]:
     recs = []
     lines = [ln for ln in text.splitlines() if ln.strip()]
@@ -56,7 +56,7 @@ def detect_and_extract_records(text: str) -> List[Dict[str, Any]]:
             return res
     raise ValueError("Unable to parse as NDJSON, JSON array, or concatenated JSON objects.")
 
-# ---------- Date / filter ----------
+#  Date / filter 
 from datetime import date
 def _parse_iso_date(s: str):
     if not s: return None
@@ -71,7 +71,7 @@ def accreditation_expires_within(record: Dict[str, Any], threshold: date, today:
             return True
     return False
 
-# ---------- IO ----------
+#  IO -
 def list_keys(bucket: str, prefix: str) -> Generator[str, None, None]:
     paginator = s3.get_paginator("list_objects_v2")
     try:
@@ -136,7 +136,7 @@ def run_job(default_bucket: str, input_prefix: str, output_prefix: str, months: 
     logger.info(f"Done. Files scanned: {total_files}, records written: {total_written}")
     return {"files_scanned": total_files, "records_written": total_written}
 
-# ---------- Lambda entry ----------
+#  Lambda entry 
 def lambda_handler(event, context):
     bucket = os.environ["BUCKET"]            # default bucket
     input_prefix = os.environ["INPUT_PREFIX"]

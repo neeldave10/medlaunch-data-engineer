@@ -6,7 +6,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 ATHENA = boto3.client("athena")
 S3 = boto3.client("s3")
 
-# --------- Logging ---------
+#  Logging
 log = logging.getLogger("on_upload_count_accredited")
 if not log.handlers:
     h = logging.StreamHandler(sys.stdout)
@@ -14,7 +14,7 @@ if not log.handlers:
     log.addHandler(h)
 log.setLevel(logging.INFO)
 
-# --------- Env vars (set these in Lambda > Configuration > Environment variables) ---------
+#  Env vars (set these in Lambda > Configuration > Environment variables) 
 ATHENA_DATABASE   = os.environ["ATHENA_DATABASE"]     # e.g., "medlaunch_db"
 ATHENA_TABLE      = os.environ["ATHENA_TABLE"]        # e.g., "facilities_raw"
 ATHENA_WORKGROUP  = os.environ.get("ATHENA_WORKGROUP", "primary")
@@ -24,40 +24,28 @@ UNLOAD_FORMAT     = os.environ.get("UNLOAD_FORMAT", "TEXTFILE")   # TEXTFILE for
 UNLOAD_DELIM      = os.environ.get("UNLOAD_DELIM", ",")
 UNLOAD_COMPRESSION= os.environ.get("UNLOAD_COMPRESSION", "NONE")  # NONE for previewable
 
-# --------- SQL builders ---------
+#  SQL builders 
 def build_sql(today_str: str) -> str:
-    """
-    UNLOAD CSV *with a header row injected* so you can preview directly in S3.
-    """
     return f"""
 UNLOAD (
   SELECT *
   FROM (
-    -- header
-    SELECT 0 AS _order,
-           'state' AS state,
-           'accredited_facilities' AS accredited_facilities
+    SELECT 0 AS _order, 'state' AS state, 'accredited_facilities' AS accredited_facilities
     UNION ALL
-    -- data
-    SELECT 1 AS _order,
-           location.state AS state,
-           CAST(COUNT(DISTINCT facility_id) AS VARCHAR) AS accredited_facilities
-    FROM {ATHENA_DATABASE}.{ATHENA_TABLE}
-    WHERE EXISTS (
-      SELECT 1
-      FROM UNNEST(accreditations) AS t(a)
+    SELECT 1 AS _order, state, CAST(accredited_facilities AS VARCHAR)
+    FROM (
+      SELECT r.location.state AS state,
+             COUNT(DISTINCT r.facility_id) AS accredited_facilities
+      FROM {ATHENA_DATABASE}.{ATHENA_TABLE} r
+      CROSS JOIN UNNEST(r.accreditations) AS t(a)
       WHERE CAST(a.valid_until AS DATE) >= DATE '{today_str}'
-    )
-    GROUP BY location.state
-  ) t
+      GROUP BY r.location.state
+    ) s
+  ) out
   ORDER BY _order, state
 )
 TO '{{OUTPUT}}'
-WITH (
-  format = '{UNLOAD_FORMAT}',
-  field_delimiter = '{UNLOAD_DELIM}',
-  compression = '{UNLOAD_COMPRESSION}'
-)
+WITH (format='TEXTFILE', field_delimiter=',', compression='NONE')
 """.strip()
 
 def results_prefix_for_object(src_bucket: str, src_key: str) -> str:
@@ -68,7 +56,7 @@ def results_prefix_for_object(src_bucket: str, src_key: str) -> str:
     base = RESULTS_S3_PREFIX.rstrip("/")
     return f"{base}/{src_bucket}/{enc_key}/{today}/"
 
-# --------- Athena helpers ---------
+#  Athena helpers 
 def start_unload(query: str, workgroup: str, output_location: str, token: str) -> str:
     # Substitute target output into query template
     q = query.replace("{OUTPUT}", output_location.rstrip("/") + "/")
@@ -102,7 +90,7 @@ def put_marker(bucket: str, key: str, data: dict):
                   Body=json.dumps(data, separators=(",", ":")).encode("utf-8"),
                   ContentType="application/json")
 
-# --------- Lambda entry ---------
+#  Lambda entry 
 def lambda_handler(event, context):
     # Expect S3 Put event(s)
     records = event.get("Records", []) if isinstance(event, dict) else []
@@ -133,7 +121,7 @@ def lambda_handler(event, context):
 
             if state != "SUCCEEDED":
                 raise RuntimeError(f"Athena query did not succeed: {qid} state={state}")
-
+            
             # Optional: write a marker for easy traceability
             out_bucket = output_prefix.split("/", 3)[2]
             out_key_prefix = output_prefix.split("/", 3)[3]
