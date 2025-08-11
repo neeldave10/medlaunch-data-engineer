@@ -18,13 +18,13 @@ flowchart LR
   subgraph S3["Amazon S3"]
     A["data/data.json (NDJSON)"]:::s3
     B["filtered/*.ndjson"]:::s3
-    C["exports/state_counts/.../000000 (CSV)"]:::s3
+    C["exports/state_counts/.../000000 CSV"]:::s3
     P["results/facility_metrics/run_*/part-*.parquet"]:::s3
   end
 
   subgraph Athena["Amazon Athena"]
-    T[("facilities_raw")]:::athena
-    M[("facility_metrics")]:::athena
+    T["facilities_raw"]:::athena
+    M["facility_metrics"]:::athena
   end
 
   subgraph Lambda["AWS Lambda"]
@@ -32,16 +32,16 @@ flowchart LR
     L3["Stage 3 On-Upload Metrics"]:::lambda
   end
 
-  A -->|Stage 1: External Table| T
+  A -->|external table| T
   T -->|CTAS| P
-  A -->|S3 Event (optional)| L2
+  A -->|S3 event| L2
   L2 -->|writes| B
-  A -->|S3 Event| L3
+  A -->|S3 event| L3
   L3 -->|UNLOAD CSV| C
 
-classDef s3 fill:#f1f8ff,stroke:#1f6feb,color:#0b2,stroke-width:1.5px;
-classDef athena fill:#fff7ed,stroke:#fb923c,color:#b45309,stroke-width:1.5px;
-classDef lambda fill:#fefce8,stroke:#eab308,color:#854d0e,stroke-width:1.5px;
+  classDef s3 fill:#f1f8ff,stroke:#1f6feb,color:#0b2,stroke-width:1.5px;
+  classDef athena fill:#fff7ed,stroke:#fb923c,color:#b45309,stroke-width:1.5px;
+  classDef lambda fill:#fefce8,stroke:#eab308,color:#854d0e,stroke-width:1.5px;
 ```
 
 ---
